@@ -141,13 +141,26 @@ Note: SSL is automatically enabled for AWS IAM authentication
 
 ### Multi-Database Mode
 
-To connect to multiple databases simultaneously, create a JSON config file and use the `--config` flag:
+To connect to multiple databases simultaneously, use one of the following:
 
+**From a config file:**
 ```
 node dist/src/index.js --config /path/to/databases.json
 ```
 
-The config file format:
+**From an inline JSON string (useful for Kubernetes/Docker):**
+```
+node dist/src/index.js --config '{"databases":[...]}'
+```
+
+**From an environment variable (ideal for Kubernetes Secrets):**
+```
+node dist/src/index.js --config-env DB_CONFIG
+```
+
+The `--config` flag auto-detects whether the value is a JSON string (starts with `{`) or a file path. The `--config-env` flag reads the JSON config from the named environment variable.
+
+The config JSON format:
 
 ```json
 {
@@ -261,6 +274,7 @@ If you installed the package globally, configure Claude Desktop with:
 
 To connect to multiple databases from a single MCP server (ideal for microservices environments):
 
+**Using a config file:**
 ```json
 {
   "mcpServers": {
@@ -274,6 +288,32 @@ To connect to multiple databases from a single MCP server (ideal for microservic
     }
   }
 }
+```
+
+**Using an environment variable (Kubernetes / Docker):**
+```json
+{
+  "mcpServers": {
+    "company-databases": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@executeautomation/database-server",
+        "--config-env", "DB_CONFIG"
+      ]
+    }
+  }
+}
+```
+
+In Kubernetes, set `DB_CONFIG` from a Secret:
+```yaml
+env:
+  - name: DB_CONFIG
+    valueFrom:
+      secretKeyRef:
+        name: mcp-db-config
+        key: config.json
 ```
 
 ### Local Development Configuration

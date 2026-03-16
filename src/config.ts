@@ -110,30 +110,25 @@ export function configToConnectionInfo(db: DatabaseConfig): { dbType: string; co
   return { dbType: 'mysql', connectionInfo };
 }
 
-export function loadConfig(filePath: string): MultiDbConfig {
-  let raw: string;
-  try {
-    raw = readFileSync(filePath, 'utf-8');
-  } catch (err) {
-    throw new Error(`Failed to read config file "${filePath}": ${(err as Error).message}`);
-  }
-
+/**
+ * Parse and validate a JSON string as MultiDbConfig
+ */
+export function parseConfig(raw: string, source: string = 'config'): MultiDbConfig {
   let parsed: any;
   try {
     parsed = JSON.parse(raw);
   } catch (err) {
-    throw new Error(`Failed to parse config file "${filePath}": ${(err as Error).message}`);
+    throw new Error(`Failed to parse ${source}: ${(err as Error).message}`);
   }
 
   if (!parsed.databases || !Array.isArray(parsed.databases)) {
-    throw new Error('Config must contain a "databases" array');
+    throw new Error(`${source} must contain a "databases" array`);
   }
 
   if (parsed.databases.length === 0) {
-    throw new Error('"databases" array must not be empty');
+    throw new Error(`${source}: "databases" array must not be empty`);
   }
 
-  // Validate each database config
   const names = new Set<string>();
   for (let i = 0; i < parsed.databases.length; i++) {
     validateDatabaseConfig(parsed.databases[i], i);
@@ -145,4 +140,34 @@ export function loadConfig(filePath: string): MultiDbConfig {
   }
 
   return parsed as MultiDbConfig;
+}
+
+/**
+ * Load config from a file path or inline JSON string.
+ * Auto-detects: if value starts with '{', treats as JSON; otherwise reads as file.
+ */
+export function loadConfig(filePathOrJson: string): MultiDbConfig {
+  if (filePathOrJson.trimStart().startsWith('{')) {
+    return parseConfig(filePathOrJson, 'inline JSON config');
+  }
+
+  let raw: string;
+  try {
+    raw = readFileSync(filePathOrJson, 'utf-8');
+  } catch (err) {
+    throw new Error(`Failed to read config file "${filePathOrJson}": ${(err as Error).message}`);
+  }
+
+  return parseConfig(raw, `config file "${filePathOrJson}"`);
+}
+
+/**
+ * Load config from an environment variable by name.
+ */
+export function loadConfigFromEnv(envVarName: string): MultiDbConfig {
+  const value = process.env[envVarName];
+  if (!value) {
+    throw new Error(`Environment variable "${envVarName}" is not set or empty`);
+  }
+  return parseConfig(value, `environment variable "${envVarName}"`);
 }

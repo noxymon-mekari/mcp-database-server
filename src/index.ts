@@ -13,7 +13,7 @@ import {
 import { initDatabase, initAllDatabases, closeDatabase } from './db/index.js';
 
 // Import config loader
-import { loadConfig } from './config.js';
+import { loadConfig, loadConfigFromEnv } from './config.js';
 
 // Import handlers
 import { handleListResources, handleReadResource } from './handlers/resourceHandlers.js';
@@ -50,16 +50,23 @@ if (args.length === 0) {
   logger.error("Usage for PostgreSQL: node index.js --postgresql --host <host> --database <database> [--user <user> --password <password> --port <port>]");
   logger.error("Usage for MySQL: node index.js --mysql --host <host> --database <database> [--user <user> --password <password> --port <port>]");
   logger.error("Usage for MySQL with AWS IAM: node index.js --mysql --aws-iam-auth --host <rds-endpoint> --database <database> --user <aws-username> --aws-region <region>");
-  logger.error("Usage for Multi-DB: node index.js --config <path-to-config.json>");
+  logger.error("Usage for Multi-DB: node index.js --config <path-or-json-string>");
+  logger.error("Usage for Multi-DB (env): node index.js --config-env <ENV_VAR_NAME>");
   process.exit(1);
 }
 
 /**
- * Initialize databases from a config file (multi-database mode)
+ * Initialize databases from a config (file path, JSON string, or env var)
  */
-async function initFromConfig(configPath: string) {
-  logger.info(`Loading multi-database config from: ${configPath}`);
-  const config = loadConfig(configPath);
+async function initFromConfig(configPathOrJson: string, fromEnv?: string) {
+  if (fromEnv) {
+    logger.info(`Loading multi-database config from env var: ${fromEnv}`);
+  } else if (configPathOrJson.trimStart().startsWith('{')) {
+    logger.info('Loading multi-database config from inline JSON');
+  } else {
+    logger.info(`Loading multi-database config from file: ${configPathOrJson}`);
+  }
+  const config = fromEnv ? loadConfigFromEnv(fromEnv) : loadConfig(configPathOrJson);
   logger.info(`Found ${config.databases.length} database(s) in config`);
 
   const { successes, failures } = await initAllDatabases(config.databases);
@@ -278,8 +285,11 @@ process.on('unhandledRejection', (reason, promise) => {
 async function runServer() {
   try {
     // Determine startup mode
+    const configEnvIndex = args.indexOf('--config-env');
     const configIndex = args.indexOf('--config');
-    if (configIndex !== -1 && configIndex + 1 < args.length) {
+    if (configEnvIndex !== -1 && configEnvIndex + 1 < args.length) {
+      await initFromConfig('', args[configEnvIndex + 1]);
+    } else if (configIndex !== -1 && configIndex + 1 < args.length) {
       await initFromConfig(args[configIndex + 1]);
     } else {
       await initFromCliArgs();
