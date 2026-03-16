@@ -14,7 +14,7 @@ export function handleListTools() {
     tools: [
       {
         name: "read_query",
-        description: "Execute SELECT queries to read data from the database",
+        description: "Execute read-only queries (SELECT, EXPLAIN, WITH, PRAGMA, SHOW, DESCRIBE) to read data from the database",
         inputSchema: {
           type: "object",
           properties: {
@@ -70,7 +70,7 @@ export function handleListTools() {
       },
       {
         name: "export_query",
-        description: "Export query results to various formats (CSV, JSON)",
+        description: "Export read-only query results (SELECT, EXPLAIN, WITH, PRAGMA, SHOW, DESCRIBE) to various formats (CSV, JSON)",
         inputSchema: {
           type: "object",
           properties: {
