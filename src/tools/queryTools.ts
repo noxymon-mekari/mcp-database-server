@@ -1,15 +1,26 @@
 import { dbAll, dbRun, dbExec } from '../db/index.js';
 import { formatErrorResponse, formatSuccessResponse, convertToCSV } from '../utils/formatUtils.js';
 
+const ALLOWED_READ_PREFIXES = ["select", "explain", "with", "pragma", "show", "describe", "desc"];
+
+function isReadOnlyQuery(query: string): boolean {
+  const normalized = query.trim().toLowerCase();
+  return ALLOWED_READ_PREFIXES.some(prefix => normalized.startsWith(prefix));
+}
+
 /**
- * Execute a read-only SQL query
+ * Execute a read-only SQL query.
+ * Supports SELECT, EXPLAIN, WITH (CTEs), PRAGMA, SHOW, and DESCRIBE/DESC statements.
  * @param query SQL query to execute
  * @returns Query results
  */
 export async function readQuery(query: string) {
   try {
-    if (!query.trim().toLowerCase().startsWith("select")) {
-      throw new Error("Only SELECT queries are allowed with read_query");
+    if (!isReadOnlyQuery(query)) {
+      throw new Error(
+        "Only read-only queries are allowed with read_query. " +
+        "Supported statements: SELECT, EXPLAIN, WITH, PRAGMA, SHOW, DESCRIBE/DESC"
+      );
     }
 
     const result = await dbAll(query);
@@ -51,8 +62,11 @@ export async function writeQuery(query: string) {
  */
 export async function exportQuery(query: string, format: string) {
   try {
-    if (!query.trim().toLowerCase().startsWith("select")) {
-      throw new Error("Only SELECT queries are allowed with export_query");
+    if (!isReadOnlyQuery(query)) {
+      throw new Error(
+        "Only read-only queries are allowed with export_query. " +
+        "Supported statements: SELECT, EXPLAIN, WITH, PRAGMA, SHOW, DESCRIBE/DESC"
+      );
     }
 
     const result = await dbAll(query);
