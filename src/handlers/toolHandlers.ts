@@ -6,12 +6,24 @@ import { createTable, alterTable, dropTable, listTables, describeTable } from '.
 import { appendInsight, listInsights } from '../tools/insightTools.js';
 
 /**
+ * Tools that perform write operations on the database.
+ * These are hidden and blocked when the server runs in readonly mode.
+ */
+const WRITE_TOOLS: ReadonlySet<string> = new Set([
+  "write_query",
+  "create_table",
+  "alter_table",
+  "drop_table",
+  "append_insight",
+]);
+
+/**
  * Handle listing available tools
+ * @param readonly Whether the server is in readonly mode
  * @returns List of available tools
  */
-export function handleListTools() {
-  return {
-    tools: [
+export function handleListTools(readonly: boolean = false) {
+  const allTools = [
       {
         name: "read_query",
         description: "Execute read-only queries (SELECT, EXPLAIN, WITH, PRAGMA, SHOW, DESCRIBE) to read data from the database",
@@ -118,18 +130,30 @@ export function handleListTools() {
           properties: {},
         },
       },
-    ],
-  };
+  ];
+
+  const tools = readonly
+    ? allTools.filter(tool => !WRITE_TOOLS.has(tool.name))
+    : allTools;
+
+  return { tools };
 }
 
 /**
  * Handle tool call requests
  * @param name Name of the tool to call
  * @param args Arguments for the tool
+ * @param readonly Whether the server is in readonly mode
  * @returns Tool execution result
  */
-export async function handleToolCall(name: string, args: any) {
+export async function handleToolCall(name: string, args: any, readonly: boolean = false) {
   try {
+    if (readonly && WRITE_TOOLS.has(name)) {
+      return formatErrorResponse(
+        `Tool "${name}" is disabled in readonly mode. The server was started with --readonly, which prevents all write operations.`
+      );
+    }
+
     switch (name) {
       case "read_query":
         return await readQuery(args.query);
