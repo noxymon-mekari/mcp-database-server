@@ -40,6 +40,8 @@ const server = new Server(
 
 // Parse command line arguments
 const args = process.argv.slice(2);
+const readonlyMode = args.includes('--readonly');
+
 if (args.length === 0) {
   logger.error("Please provide database connection information");
   logger.error("Usage for SQLite: node index.js <database_file_path>");
@@ -47,6 +49,7 @@ if (args.length === 0) {
   logger.error("Usage for PostgreSQL: node index.js --postgresql --host <host> --database <database> [--user <user> --password <password> --port <port>]");
   logger.error("Usage for MySQL: node index.js --mysql --host <host> --database <database> [--user <user> --password <password> --port <port>]");
   logger.error("Usage for MySQL with AWS IAM: node index.js --mysql --aws-iam-auth --host <rds-endpoint> --database <database> --user <aws-username> --aws-region <region>");
+  logger.error("Global options: [--readonly]");
   process.exit(1);
 }
 
@@ -185,7 +188,12 @@ else if (args.includes('--mysql')) {
 } else {
   // SQLite mode (default)
   dbType = 'sqlite';
-  connectionInfo = args[0]; // First argument is the SQLite file path
+  const dbPath = args.find((arg: string) => !arg.startsWith('--'));
+  if (!dbPath) {
+    logger.error("Please provide a database file path for SQLite mode");
+    process.exit(1);
+  }
+  connectionInfo = dbPath;
   logger.info(`Using SQLite database at path: ${connectionInfo}`);
 }
 
@@ -199,11 +207,11 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return handleListTools();
+  return handleListTools(readonlyMode);
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  return await handleToolCall(request.params.name, request.params.arguments);
+  return await handleToolCall(request.params.name, request.params.arguments, readonlyMode);
 });
 
 // Handle shutdown gracefully
@@ -249,7 +257,11 @@ async function runServer() {
     
     const dbInfo = getDatabaseMetadata();
     logger.info(`Connected to ${dbInfo.name} database`);
-    
+
+    if (readonlyMode) {
+      logger.warn('READONLY MODE ENABLED: All write operations are disabled');
+    }
+
     logger.info('Starting MCP server...');
     const transport = new StdioServerTransport();
     await server.connect(transport);
