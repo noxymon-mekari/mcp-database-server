@@ -1,10 +1,11 @@
-import { dbAll, dbExec, dbRun } from '../db/index.js';
 import { formatSuccessResponse } from '../utils/formatUtils.js';
+
+// In-memory insight storage (database-agnostic, works with any DB type)
+const insights: Array<{ id: number; insight: string; created_at: string }> = [];
+let nextId = 1;
 
 /**
  * Add a business insight to the memo
- * @param insight Business insight text
- * @returns Result of the operation
  */
 export async function appendInsight(insight: string) {
   try {
@@ -12,21 +13,12 @@ export async function appendInsight(insight: string) {
       throw new Error("Insight text is required");
     }
 
-    // Create insights table if it doesn't exist
-    await dbExec(`
-      CREATE TABLE IF NOT EXISTS mcp_insights (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        insight TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    
-    // Insert the insight
-    await dbRun(
-      "INSERT INTO mcp_insights (insight) VALUES (?)",
-      [insight]
-    );
-    
+    insights.push({
+      id: nextId++,
+      insight,
+      created_at: new Date().toISOString(),
+    });
+
     return formatSuccessResponse({ success: true, message: "Insight added" });
   } catch (error: any) {
     throw new Error(`Error adding insight: ${error.message}`);
@@ -35,30 +27,11 @@ export async function appendInsight(insight: string) {
 
 /**
  * List all insights in the memo
- * @returns Array of insights
  */
 export async function listInsights() {
   try {
-    // Check if insights table exists
-    const tableExists = await dbAll(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name = 'mcp_insights'"
-    );
-    
-    if (tableExists.length === 0) {
-      // Create table if it doesn't exist
-      await dbExec(`
-        CREATE TABLE IF NOT EXISTS mcp_insights (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          insight TEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      return formatSuccessResponse([]);
-    }
-    
-    const insights = await dbAll("SELECT * FROM mcp_insights ORDER BY created_at DESC");
-    return formatSuccessResponse(insights);
+    return formatSuccessResponse([...insights].reverse());
   } catch (error: any) {
     throw new Error(`Error listing insights: ${error.message}`);
   }
-} 
+}

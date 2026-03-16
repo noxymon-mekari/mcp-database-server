@@ -4,14 +4,27 @@ import { formatErrorResponse } from '../utils/formatUtils.js';
 import { readQuery, writeQuery, exportQuery } from '../tools/queryTools.js';
 import { createTable, alterTable, dropTable, listTables, describeTable } from '../tools/schemaTools.js';
 import { appendInsight, listInsights } from '../tools/insightTools.js';
+import { listDatabases } from '../tools/databaseTools.js';
+
+const databaseProperty = {
+  type: "string",
+  description: "Name of the database to operate on. Required when multiple databases are configured.",
+};
 
 /**
  * Handle listing available tools
- * @returns List of available tools
  */
 export function handleListTools() {
   return {
     tools: [
+      {
+        name: "list_databases",
+        description: "List all configured database connections and their types",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
       {
         name: "read_query",
         description: "Execute SELECT queries to read data from the database",
@@ -19,6 +32,7 @@ export function handleListTools() {
           type: "object",
           properties: {
             query: { type: "string" },
+            database: databaseProperty,
           },
           required: ["query"],
         },
@@ -30,6 +44,7 @@ export function handleListTools() {
           type: "object",
           properties: {
             query: { type: "string" },
+            database: databaseProperty,
           },
           required: ["query"],
         },
@@ -41,6 +56,7 @@ export function handleListTools() {
           type: "object",
           properties: {
             query: { type: "string" },
+            database: databaseProperty,
           },
           required: ["query"],
         },
@@ -52,6 +68,7 @@ export function handleListTools() {
           type: "object",
           properties: {
             query: { type: "string" },
+            database: databaseProperty,
           },
           required: ["query"],
         },
@@ -64,6 +81,7 @@ export function handleListTools() {
           properties: {
             table_name: { type: "string" },
             confirm: { type: "boolean" },
+            database: databaseProperty,
           },
           required: ["table_name", "confirm"],
         },
@@ -76,6 +94,7 @@ export function handleListTools() {
           properties: {
             query: { type: "string" },
             format: { type: "string", enum: ["csv", "json"] },
+            database: databaseProperty,
           },
           required: ["query", "format"],
         },
@@ -85,7 +104,9 @@ export function handleListTools() {
         description: "Get a list of all tables in the database",
         inputSchema: {
           type: "object",
-          properties: {},
+          properties: {
+            database: databaseProperty,
+          },
         },
       },
       {
@@ -95,6 +116,7 @@ export function handleListTools() {
           type: "object",
           properties: {
             table_name: { type: "string" },
+            database: databaseProperty,
           },
           required: ["table_name"],
         },
@@ -124,47 +146,47 @@ export function handleListTools() {
 
 /**
  * Handle tool call requests
- * @param name Name of the tool to call
- * @param args Arguments for the tool
- * @returns Tool execution result
  */
 export async function handleToolCall(name: string, args: any) {
   try {
     switch (name) {
+      case "list_databases":
+        return await listDatabases();
+
       case "read_query":
-        return await readQuery(args.query);
-      
+        return await readQuery(args.query, args.database);
+
       case "write_query":
-        return await writeQuery(args.query);
-      
+        return await writeQuery(args.query, args.database);
+
       case "create_table":
-        return await createTable(args.query);
-      
+        return await createTable(args.query, args.database);
+
       case "alter_table":
-        return await alterTable(args.query);
-      
+        return await alterTable(args.query, args.database);
+
       case "drop_table":
-        return await dropTable(args.table_name, args.confirm);
-      
+        return await dropTable(args.table_name, args.confirm, args.database);
+
       case "export_query":
-        return await exportQuery(args.query, args.format);
-      
+        return await exportQuery(args.query, args.format, args.database);
+
       case "list_tables":
-        return await listTables();
-      
+        return await listTables(args.database);
+
       case "describe_table":
-        return await describeTable(args.table_name);
-      
+        return await describeTable(args.table_name, args.database);
+
       case "append_insight":
         return await appendInsight(args.insight);
-      
+
       case "list_insights":
         return await listInsights();
-      
+
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error: any) {
     return formatErrorResponse(error);
   }
-} 
+}

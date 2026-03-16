@@ -24,10 +24,11 @@ npm run build
 
 ## Usage Options
 
-There are two ways to use this MCP server with Claude:
+There are three ways to use this MCP server with Claude:
 
 1. **Direct usage**: Install the package globally and use it directly
 2. **Local development**: Run from your local development environment
+3. **Multi-database mode**: Connect to multiple databases simultaneously using a config file
 
 ### Direct Usage with NPM Package
 
@@ -138,6 +139,53 @@ Required parameters:
 
 Note: SSL is automatically enabled for AWS IAM authentication
 
+### Multi-Database Mode
+
+To connect to multiple databases simultaneously, create a JSON config file and use the `--config` flag:
+
+```
+node dist/src/index.js --config /path/to/databases.json
+```
+
+The config file format:
+
+```json
+{
+  "databases": [
+    {
+      "name": "users-service",
+      "type": "postgresql",
+      "host": "localhost",
+      "port": 5432,
+      "database": "users_db",
+      "user": "admin",
+      "password": "secret"
+    },
+    {
+      "name": "orders-service",
+      "type": "mysql",
+      "host": "localhost",
+      "port": 3306,
+      "database": "orders_db",
+      "user": "admin",
+      "password": "secret"
+    },
+    {
+      "name": "analytics",
+      "type": "sqlite",
+      "path": "/data/analytics.db"
+    }
+  ]
+}
+```
+
+Each database entry requires:
+- `name`: A unique alias for the database
+- `type`: One of `sqlite`, `sqlserver`, `postgresql`, `mysql`
+- Connection fields depending on type (same as the CLI parameters above)
+
+When multiple databases are configured, pass the `database` parameter in tool calls to specify which database to target. Use the `list_databases` tool to see all available connections.
+
 ## Configuring Claude Desktop
 
 ### Direct Usage Configuration
@@ -203,6 +251,25 @@ If you installed the package globally, configure Claude Desktop with:
         "--database", "your-database-name",
         "--user", "your-aws-username",
         "--aws-region", "us-east-1"
+      ]
+    }
+  }
+}
+```
+
+### Multi-Database Configuration
+
+To connect to multiple databases from a single MCP server (ideal for microservices environments):
+
+```json
+{
+  "mcpServers": {
+    "company-databases": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@executeautomation/database-server",
+        "--config", "/path/to/databases.json"
       ]
     }
   }
@@ -284,6 +351,7 @@ The MCP Database Server provides the following tools that Claude can use:
 
 | Tool | Description | Required Parameters |
 |------|-------------|---------------------|
+| `list_databases` | List all configured database connections | None |
 | `read_query` | Execute SELECT queries to read data | `query`: SQL SELECT statement |
 | `write_query` | Execute INSERT, UPDATE, or DELETE queries | `query`: SQL modification statement |
 | `create_table` | Create new tables in the database | `query`: CREATE TABLE statement |
@@ -294,6 +362,8 @@ The MCP Database Server provides the following tools that Claude can use:
 | `export_query` | Export query results as CSV/JSON | `query`: SQL SELECT statement<br>`format`: "csv" or "json" |
 | `append_insight` | Add a business insight to memo | `insight`: Text of insight |
 | `list_insights` | List all business insights | None |
+
+All database tools (except `append_insight`, `list_insights`, `list_databases`) accept an optional `database` parameter to specify which database to target. This parameter is required when multiple databases are configured.
 
 For practical examples of how to use these tools with Claude, see [Usage Examples](docs/usage-examples.md).
 
